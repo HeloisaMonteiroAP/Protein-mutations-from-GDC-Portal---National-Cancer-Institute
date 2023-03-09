@@ -1,0 +1,96 @@
+getwd()
+# Check if "devtools" installed
+if("devtools" %in% rownames(installed.packages()) == FALSE){ 
+  install.packages("devtools")
+}
+
+# install from github
+devtools::install_github("lcnzg/g3viz")
+devtools::install_github("cBioPortal/cgdsr")
+
+# Connect to CGDS (cancer Genomics Data Server)
+cgds <- cgdsr::CGDS("http://www.cbioportal.org/")
+
+# Test if connection is OK
+cgdsr::test(cgds)
+
+# To list all studies
+#all.studies <- cgdsr::getCancerStudies(cgds)
+#write.table(all.studies, "all-studies.tsv", row.names = FALSE,sep='\t')
+
+gene = "xxxx"
+
+data("mutation.table.df", package = "g3viz")
+
+#row.names(all.studies) <- all.studies$cancer_study_id
+
+library(readxl)
+all_studies_non_redundant <- read_excel("~/MESTRADO_CBMEG_CQMED_LabRNA/MESTRADO/BICC1 Project/BICC1 mutations/Database CDC/GDC BICC1/all.studies.non.redundant.xlsx")
+#View(all_studies_non_redundant)
+
+# Create an empty mutation dataframe
+mutation.dat <- data.frame(matrix(ncol = 9, nrow = 0))
+required.colnames <- c("gene_symbol", "amino_acid_change", "case_id", "mutation_type",
+                       "chr", "start_position", "end_position",
+                       "reference_allele", "variant_allele")
+colnames(mutation.dat) <- required.colnames
+
+
+
+# Pick all cancer studies with mutation data
+for (id in all_studies_non_redundant$cancer_study_id) {
+  try({
+  mutation.dat.new <- g3viz::getMutationsFromCbioportal(id, gene)
+  mutation.dat <- rbind(mutation.dat.new, mutation.dat, overwrite=FALSE)
+  }, silent=TRUE)
+}
+
+mutation.dat.new2 <- mutation.dat
+mutation.dat.new2$Mutation_Class <- mutation.dat.new2$Mutation_Type
+
+# "cbioportal" chart theme
+plot.options <- g3viz::g3Lollipop.options(legend.title = "Mutation_Type",
+                                          # chart options
+                                          chart.width = 700,
+                                          chart.type = "circle",
+                                          # lollipop track options
+                                          lollipop.track.height = 360,
+                                          lollipop.track.background = "transparent",
+                                          lollipop.pop.max.size = 4,
+                                          lollipop.pop.min.size = 4,
+                                          axis.label.font = "normal 15px Times",
+                                          # set larger than lollipop.pop.max.size to turn off pop info
+                                          lollipop.pop.info.limit = 4.1,
+                                          # y-axis label
+                                          lollipop.line.color = "grey",
+                                          lollipop.line.width = 0.5,
+                                          lollipop.circle.color = "grey",
+                                          lollipop.circle.width = 0.5,
+                                          lollipop.color.scheme = "dark2",
+                                          y.axis.line.color = "transparent",
+                                          # domain annotation bar
+                                          anno.bar.fill = "#969696",
+                                          anno.bar.margin = list(top = 4, bottom = 8),
+                                          # domain track options
+                                          domain.margin = list(top = 2, bottom = 6),
+                                          domain.color.scheme = "dark2",
+                                          domain.text.font = "normal 14px Times",
+                                          domain.text.color = "white",
+                                          # highlight text
+                                          highlight.text.angle = 45,
+                                          # disable brush
+                                            brush = FALSE,
+                                          # disable legend
+                                          legend = TRUE,
+                                        title.text = paste(gene, "mutations from cBioPortal for Cancer Genomics database"),
+                                        title.font = "normal 16px Times",
+                                        title.alignment = "middle",
+                                        y.axis.label = paste("#", gene, " Mutations"))
+    
+g3viz::g3Lollipop(mutation.dat.new2,
+                  gene.symbol = gene,
+                  legend(x="Mutation_Type"),
+                  btn.style = "gray", # gray-style chart download buttons
+                  plot.options = plot.options,
+                  output.filename = "cbioportal_theme",
+                  pfam.file = "xxxx.json")
